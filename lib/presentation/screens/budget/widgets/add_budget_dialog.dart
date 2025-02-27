@@ -4,15 +4,19 @@ import '../../../../data/models/budget.dart';
 import '../../../../data/models/categoryBudget.dart';
 import '../../../../data/models/category.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../data/repositories/category_repository.dart';
+import '../../../../data/data_sources/local/database_helper.dart';
 
 class AddBudgetDialog extends StatefulWidget {
   final Budget? budget;
-  final List<Category> categories;
+
+  // Made categories optional since we'll load them if not provided
+  final List<Category>? categories;
 
   const AddBudgetDialog({
     Key? key,
     this.budget,
-    required this.categories,
+    this.categories,
   }) : super(key: key);
 
   @override
@@ -25,7 +29,12 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
   final Map<String, TextEditingController> _categoryControllers = {};
   double _allocated = 0;
   double _total = 0;
-  String? _selectedCategory; // Define the selected category
+  String? _selectedCategory;
+
+  // Add repository and loading state
+  late CategoryRepository _categoryRepository;
+  List<Category> _categories = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
@@ -34,8 +43,44 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
       text: widget.budget?.amount.toString() ?? '',
     );
 
-    // Initialize category controllers and set the selected category
-    for (final category in widget.categories) {
+    // Initialize repository
+    _categoryRepository = CategoryRepository(DatabaseHelper());
+
+    // If categories were provided, use them, otherwise load them
+    if (widget.categories != null && widget.categories!.isNotEmpty) {
+      _categories = widget.categories!;
+      _initializeControllers();
+      _isLoading = false;
+    } else {
+      _loadCategories();
+    }
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final categories = await _categoryRepository.getVisibleCategories();
+
+      setState(() {
+        _categories = categories;
+        _initializeControllers();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Show error if we're mounted
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load categories: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  void _initializeControllers() {
+    // Initialize category controllers
+    for (final category in _categories) {
       final categoryBudget = widget.budget?.categoryBudgets.firstWhere(
             (cb) => cb.categoryId == category.id,
         orElse: () => CategoryBudget(
@@ -49,9 +94,14 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
       );
     }
 
-    // Set the initial selected category (e.g., the first category in the list)
-    if (widget.categories.isNotEmpty) {
-      _selectedCategory = widget.categories.first.id;
+    // Set the initial selected category
+    if (_categories.isNotEmpty) {
+      // If editing an existing budget, try to use its category
+      if (widget.budget != null) {
+        _selectedCategory = widget.budget!.category;
+      } else {
+        _selectedCategory = _categories.first.id;
+      }
     }
 
     _calculateTotals();
@@ -96,7 +146,7 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
 
     return Budget(
       id: widget.budget?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      category: _selectedCategory!, // Use the selected category
+      category: _selectedCategory ?? _categories.first.id, // Fallback to first category if somehow none selected
       amount: double.parse(_totalController.text),
       startDate: widget.budget?.startDate ?? DateTime.now(),
       endDate: widget.budget?.endDate ?? DateTime.now().add(const Duration(days: 30)),
@@ -108,7 +158,14 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.budget == null ? 'Create Budget' : 'Edit Budget'),
-      content: Form(
+      content: _isLoading ?
+      // Show loading indicator while categories are being loaded
+      const SizedBox(
+        height: 100,
+        child: Center(child: CircularProgressIndicator()),
+      ) :
+      // Show form once categories are loaded
+      Form(
         key: _formKey,
         child: SizedBox(
           width: double.maxFinite,
@@ -148,47 +205,40 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
               ),
               const SizedBox(height: 16),
 
-              // Category Selection Dropdown
-              DropdownButtonFormField<String>(
-                value: _selectedCategory,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCategory = value;
-                  });
-                },
-                items: widget.categories.map((category) {
-                  return DropdownMenuItem<String>(
-                    value: category.id,
-                    child: Text(category.name),
-                  );
-                }).toList(),
-                decoration: const InputDecoration(
-                  labelText: 'Select Category',
-                  prefixIcon: Icon(Icons.category),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // Category Allocations Inputs
-              ...widget.categories.map((category) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: TextFormField(
-                    controller: _categoryControllers[category.id],
-                    decoration: InputDecoration(
-                      labelText: category.name,
-                      prefixIcon: const Icon(Icons.category),
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}')),
-                    ],
-                    onChanged: (value) {
-                      _calculateTotals();
-                    },
+              // Only show dropdown if we have categories
+              if (_categories.isNotEmpty) ...[
+                // Category Selection Dropdown
+                DropdownButtonFormField<String>(
+                  value: _selectedCategory,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCategory = value;
+                    });
+                  },
+                  items: _categories.map((category) {
+                    return DropdownMenuItem<String>(
+                      value: category.id,
+                      child: Text(category.name),
+                    );
+                  }).toList(),
+                  decoration: const InputDecoration(
+                    labelText: 'Select Category',
+                    prefixIcon: Icon(Icons.category),
                   ),
-                );
-              }).toList(),
+                ),
+              ] else ...[
+                // Show a message if no categories are available
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text(
+                      'No categories available. Please create categories first.',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 16),
               const Divider(),
 
@@ -233,8 +283,9 @@ class _AddBudgetDialogState extends State<AddBudgetDialog> {
           },
           child: const Text('Cancel'),
         ),
+        // Disable the Create/Update button if loading or no categories
         ElevatedButton(
-          onPressed: () {
+          onPressed: _isLoading || _categories.isEmpty ? null : () {
             if (_formKey.currentState!.validate()) {
               Navigator.of(context).pop(_createBudget());
             }

@@ -34,24 +34,29 @@ class ExpenseChart extends StatelessWidget {
       );
     }
 
-    switch (chartType) {
-      case ChartType.pie:
-        return _buildPieChart(context);
-      case ChartType.bar:
-        return _buildBarChart(context);
-      case ChartType.line:
-        return _buildLineChart(context);
-      default:
-        return _buildPieChart(context);
-    }
+    // Use LayoutBuilder to adapt to the available space
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        switch (chartType) {
+          case ChartType.pie:
+            return _buildPieChart(context, constraints);
+          case ChartType.bar:
+            return _buildBarChart(context, constraints);
+          case ChartType.line:
+            return _buildLineChart(context, constraints);
+          default:
+            return _buildPieChart(context, constraints);
+        }
+      },
+    );
   }
 
-  Widget _buildPieChart(BuildContext context) {
+  Widget _buildPieChart(BuildContext context, BoxConstraints constraints) {
     final Map<String, double> categoryTotals = {};
 
     // Calculate totals by category
     for (final expense in expenses) {
-      final categoryName = _getCategoryName(expense.category); // Updated to use expense.category instead of categoryId
+      final categoryName = _getCategoryName(expense.category);
       categoryTotals[categoryName] = (categoryTotals[categoryName] ?? 0) + expense.amount;
     }
 
@@ -74,7 +79,6 @@ class ExpenseChart extends StatelessWidget {
 
     categoryTotals.forEach((category, amount) {
       final totalExpenses = _getTotalExpenses();
-      // Added null check to prevent division by zero
       final percentage = totalExpenses > 0 ? (amount / totalExpenses * 100) : 0;
 
       sections.add(
@@ -82,9 +86,9 @@ class ExpenseChart extends StatelessWidget {
           value: amount,
           title: '${percentage.toStringAsFixed(1)}%',
           color: colors[colorIndex % colors.length],
-          radius: 100,
+          radius: 100, // Reduced radius from 100 to 50
           titleStyle: const TextStyle(
-            fontSize: 14,
+            fontSize: 12, // Reduced from 14
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
@@ -93,40 +97,56 @@ class ExpenseChart extends StatelessWidget {
       colorIndex++;
     });
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 300,
-          child: PieChart(
-            PieChartData(
-              sections: sections,
-              centerSpaceRadius: 40,
-              sectionsSpace: 2,
-              borderData: FlBorderData(show: false),
+    // Calculate appropriate chart size based on available height
+    final double availableHeight = constraints.maxHeight;
+    final double chartHeight = availableHeight * 0.7; // 70% for chart
+    final double legendHeight = availableHeight * 0.3; // 30% for legend
+
+    return SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min, // Use minimum height needed
+        children: [
+          SizedBox(
+            height: chartHeight,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                centerSpaceRadius: 20, // Reduced from 40
+                sectionsSpace: 2,
+                borderData: FlBorderData(show: false),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 24),
-        Wrap(
-          spacing: 16,
-          runSpacing: 8,
-          children: List.generate(
-            categoryTotals.length,
-                (index) {
-              final entry = categoryTotals.entries.elementAt(index);
-              return _buildLegendItem(
-                entry.key,
-                CurrencyFormatter.format(entry.value),
-                colors[index % colors.length],
-              );
-            },
+          const SizedBox(height: 8), // Reduced from 24
+          SizedBox(
+            height: legendHeight,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  categoryTotals.length,
+                      (index) {
+                    final entry = categoryTotals.entries.elementAt(index);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: _buildLegendItem(
+                        entry.key,
+                        CurrencyFormatter.format(entry.value),
+                        colors[index % colors.length],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _buildBarChart(BuildContext context) {
+  Widget _buildBarChart(BuildContext context, BoxConstraints constraints) {
     // Group expenses by day, week, or month depending on date range
     final Map<String, double> groupedData = {};
     final difference = endDate.difference(startDate).inDays;
@@ -177,7 +197,7 @@ class ExpenseChart extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 300,
+      height: constraints.maxHeight, // Use available height
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
@@ -242,7 +262,7 @@ class ExpenseChart extends StatelessWidget {
     );
   }
 
-  Widget _buildLineChart(BuildContext context) {
+  Widget _buildLineChart(BuildContext context, BoxConstraints constraints) {
     // Group expenses by date
     final Map<DateTime, double> dateMap = {};
 
@@ -266,7 +286,7 @@ class ExpenseChart extends StatelessWidget {
     );
 
     return SizedBox(
-      height: 300,
+      height: constraints.maxHeight, // Use available height
       child: LineChart(
         LineChartData(
           lineBarsData: [
@@ -362,6 +382,7 @@ class ExpenseChart extends StatelessWidget {
         const SizedBox(width: 8),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               title,
@@ -389,7 +410,6 @@ class ExpenseChart extends StatelessWidget {
   }
 
   String _getCategoryName(String categoryId) {
-    // Updated to use the new Category model
     try {
       final category = categories.firstWhere(
             (cat) => cat.id == categoryId,

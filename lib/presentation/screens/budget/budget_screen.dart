@@ -66,7 +66,7 @@ class _BudgetScreenState extends State<BudgetScreen> {
       context: context,
       builder: (context) => AddBudgetDialog(
         budget: _currentBudget,
-        categories: _categories,
+        // categories: _categories,
       ),
     );
 

@@ -187,7 +187,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
-                    height: 150,
+                    height: 350,
                     child: ExpenseChart(
                       expenses: _expenses,
                       categories: _categories,
