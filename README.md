@@ -1,16 +1,37 @@
-# cash_guard
+# Smart Expense & Budget Tracker for Students
 
-A new Flutter project.
+![App Screenshot](images/mb1.jpg)
 
-## Getting Started
+## Overview
+The **Smart Expense & Budget Tracker for Students** is a personal finance management application designed to help students track their daily expenses, manage budgets, and save money efficiently.
 
-This project is a starting point for a Flutter application.
+## Core Features
 
-A few resources to get you started if this is your first Flutter project:
+### 1. Expense Logging & Categorization
+- **Manual Entry**: Users can manually enter their expenses.
+- **Categories**: Expenses can be categorized under various headings.
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+![Expense Logging](images/mb3.jpg)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### 2. Budget Setting & Alerts
+- **Create Budget**: Users can define a total monthly budget.
+
+![Budget Setting](images/mb4.jpg)
+
+### 3. Savings Goals & Reminders
+- **Set Goals**: Users can set savings goals.
+
+![Savings Goals](images/mb5.jpg)
+![Add Contribution](images/mb6.jpg)
+
+### 4. Simple Reports & Graphs
+- **Visual Representation**: Provides visual reports.
+
+![Expense Reports](images/mb10.jpg)
+
+## Conclusion
+The **Smart Expense & Budget Tracker for Students** is an essential tool for students looking to manage their finances effectively.
+
+---
+
+Feel free to explore the app and take control of your finances today!
